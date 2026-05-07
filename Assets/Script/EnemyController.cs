@@ -1,381 +1,461 @@
+using System.Collections;
 using UnityEngine;
-
+ 
 /// <summary>
-/// EnemyController - Chess Pawn Style Enemy
-/// 
-/// ระบบหลัก:
-///   1. Detection Circle  → เช็คว่า Player อยู่ในระยะ Aggro หรือยัง
-///   2. Attack Raycasts   → 3 เส้น (หน้า / เฉียงหน้า / หลัง) เช็คตำแหน่ง Player
-///   3. Backstep          → ถอยหลัง 1 ช่อง หลังโจมตี
-/// 
-/// การทำงาน:
-///   - ถ้า Player อยู่ใน Detection Circle → Enemy จะหันหน้าหา / เดินตาม (Grid-based)
-///   - ถ้า Player อยู่ใน Attack Range (Raycast) → โจมตี แล้วถอย 1 ช่อง
+/// EnemyController — Silksong Grunt Style
+///
+/// State Machine:
+///   PATROL   → เดินไปมาระหว่าง 2 จุด (Grid-based), หยุดสั้นๆ ที่ขอบ
+///   AGGRO    → ตรวจจับ Player ด้วย Detection Circle แล้วไล่ตาม
+///   ATTACK   → ยิง 3 Raycast เช็คตำแหน่ง Player แล้วโจมตี
+///   BACKSTEP → ถอยหลัง 1 ช่อง หลังโจมตี
+///
+/// การขึ้น Platform:
+///   ใช้ Grid Step Up เหมือน PlayerController
+///   ถ้าช่องข้างหน้าบล็อค แต่ช่องบนว่าง → ขึ้นทันที (ไม่ใช้ Physics Jump)
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class EnemyController : MonoBehaviour
 {
     // ══════════════════════════════════════════════════
-    //  INSPECTOR FIELDS
+    //  STATE
     // ══════════════════════════════════════════════════
-
+ 
+    public enum EnemyState { Patrol, Aggro, Attack, Backstep }
+    public EnemyState currentState = EnemyState.Patrol;
+ 
+    // ══════════════════════════════════════════════════
+    //  INSPECTOR
+    // ══════════════════════════════════════════════════
+ 
     [Header("Grid Settings")]
     [Tooltip("ต้องตรงกับ cellSize ของ PlayerController")]
     public float cellSize = 1f;
-
-    [Header("Movement Settings")]
-    public float moveSpeed = 5f;
-
-    [Tooltip("หน่วงเวลาระหว่างการเดินแต่ละก้าว (วินาที)")]
-    public float moveInterval = 0.8f;
-
-    [Header("─── 1. Detection Circle ───")]
-    [Tooltip("รัศมีวงกลมตรวจจับ Player")]
+ 
+    [Header("Movement")]
+    public float moveSpeed      = 4f;
+    public float aggroMoveSpeed = 6f;
+ 
+    [Tooltip("หน่วงระหว่างก้าว (วินาที)")]
+    public float patrolStepInterval = 0.6f;
+    public float aggroStepInterval  = 0.35f;
+ 
+    [Header("── Patrol ──")]
+    [Tooltip("จำนวนช่องที่เดินออกจากจุดเริ่มต้น (ซ้าย/ขวา)")]
+    public int patrolRange = 4;
+ 
+    [Tooltip("หน่วงเวลาหยุดที่ขอบก่อนหันกลับ")]
+    public float patrolTurnPause = 0.5f;
+ 
+    [Header("── Detection ──")]
     public float detectionRadius = 5f;
-
-    [Header("─── 2. Attack Raycasts ───")]
-    [Tooltip("ระยะ Raycast โจมตี")]
-    public float attackRange = 1.5f;
-
-    [Tooltip("มุมเฉียงของ Raycast ด้านข้าง (องศา)")]
+    public float deaggroRadius   = 7f;
+ 
+    [Tooltip("Pause สั้นๆ ตอน 'ตื่น' เจอ Player")]
+    public float aggroWakeDelay = 0.25f;
+ 
+    [Header("── Attack Raycasts ──")]
+    public float attackRange   = 1.5f;
     public float diagonalAngle = 30f;
-
-    [Tooltip("Layer ของ Player")]
     public LayerMask playerLayer;
-
-    [Header("─── 3. Backstep ───")]
-    [Tooltip("ดีเลย์ก่อนถอยหลัง (วินาที)")]
-    public float backstepDelay = 0.3f;
-
-    [Header("Attack Settings")]
-    [Tooltip("Cooldown ระหว่างการโจมตี (วินาที)")]
-    public float attackCooldown = 1.2f;
-
-    [Tooltip("Damage ที่ส่งผ่าน SendMessage (ถ้าไม่ใช้ให้ปล่อยว่าง)")]
-    public float attackDamage = 10f;
-
+ 
+    [Tooltip("Windup ก่อนตี")]
+    public float attackWindup   = 0.2f;
+    public float attackCooldown = 1.4f;
+    public float attackDamage   = 10f;
+ 
+    [Header("── Backstep ──")]
+    public float backstepDelay = 0.15f;
+ 
+    [Header("── Collision Layers ──")]
+    [Tooltip("Layer พื้นหลัก (Base)")]
+    public LayerMask groundLayer;
+ 
+    [Tooltip("Layer Platform / กล่อง — ใช้เช็ค Step Up")]
+    public LayerMask obstacleLayer;
+ 
     [Header("References")]
     public Transform player;
-    public SpriteRenderer spriteRenderer;
-
+ 
     // ══════════════════════════════════════════════════
-    //  PRIVATE STATE
+    //  PRIVATE
     // ══════════════════════════════════════════════════
-
-    private Rigidbody2D rb;
-
-    // Grid movement
+ 
+    private Rigidbody2D    rb;
+    private SpriteRenderer sr;
+ 
     private Vector3 targetPosition;
-    private bool isMoving = false;
-    private int facingDirection = 1;   // +1 = ขวา, -1 = ซ้าย
-
-    // Timers
-    private float moveTimer = 0f;
+    private bool    isMoving = false;
+    private int     facingDirection = 1;
+ 
+    private float patrolOriginX;
+    private int   patrolDirection = 1;
+ 
+    private float stepTimer   = 0f;
     private float attackTimer = 0f;
-
-    // State
-    private bool isBackstepping = false;
-
+    private bool  isBusy      = false;
+ 
+    // รวม Layer ทั้งสองสำหรับ Gravity check
+    private LayerMask combinedLayer => groundLayer | obstacleLayer;
+ 
     // ══════════════════════════════════════════════════
     //  UNITY CALLBACKS
     // ══════════════════════════════════════════════════
-
+ 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
+        sr = GetComponent<SpriteRenderer>();
+ 
+        rb.gravityScale   = 0f;   // Grid-based ปิด gravity เหมือน Player
         rb.freezeRotation = true;
-
+        rb.linearVelocity = Vector2.zero;
+ 
         transform.position = SnapToGrid(transform.position);
-        targetPosition = transform.position;
-
-        // Auto-find player ถ้าไม่ได้ drag ใน Inspector
+        targetPosition     = transform.position;
+        patrolOriginX      = transform.position.x;
+ 
         if (player == null)
         {
-            GameObject go = GameObject.FindGameObjectWithTag("Player");
+            var go = GameObject.FindGameObjectWithTag("Player");
             if (go != null) player = go.transform;
         }
+ 
+        ApplyGridGravity();
     }
-
+ 
     void Update()
     {
-        if (player == null) return;
-
+        if (player == null || isBusy) return;
+ 
         attackTimer -= Time.deltaTime;
-        moveTimer -= Time.deltaTime;
-
-        // ── 1. Detection Circle ──────────────────────
-        if (!IsPlayerInDetectionRange()) return;
-
-        // ── 2. Attack Raycasts ───────────────────────
-        RaycastHitInfo hitInfo = CheckAttackRaycasts();
-
-        if (hitInfo.hit && attackTimer <= 0f)
+        stepTimer   -= Time.deltaTime;
+ 
+        switch (currentState)
         {
-            PerformAttack(hitInfo);
-            return;   // โจมตีแล้ว ไม่ต้องเดินในเฟรมนี้
-        }
-
-        // ── Chase (เดินตาม) ──────────────────────────
-        if (!isMoving && !isBackstepping && moveTimer <= 0f)
-        {
-            ChasePlayer();
+            case EnemyState.Patrol:   UpdatePatrol(); break;
+            case EnemyState.Aggro:    UpdateAggro();  break;
+            case EnemyState.Attack:   break;
+            case EnemyState.Backstep: break;
         }
     }
-
+ 
     void FixedUpdate()
     {
         if (!isMoving) return;
-
-        float newX = Mathf.MoveTowards(
-            transform.position.x,
-            targetPosition.x,
-            moveSpeed * Time.fixedDeltaTime
-        );
-        transform.position = new Vector3(newX, transform.position.y, transform.position.z);
-
-        if (Mathf.Abs(transform.position.x - targetPosition.x) < 0.01f)
+ 
+        float speed = (currentState == EnemyState.Aggro) ? aggroMoveSpeed : moveSpeed;
+ 
+        // เคลื่อนที่ทั้ง X และ Y (รองรับ Step Up)
+        Vector3 newPos = Vector3.MoveTowards(transform.position, targetPosition, speed * Time.fixedDeltaTime);
+        rb.MovePosition(newPos);
+ 
+        if (Vector3.Distance(transform.position, targetPosition) < 0.01f)
         {
-            transform.position = new Vector3(targetPosition.x, transform.position.y, transform.position.z);
+            rb.MovePosition(targetPosition);
+            transform.position = targetPosition;
             isMoving = false;
+ 
+            // หลังถึงเป้าหมาย → เช็ค Gravity
+            ApplyGridGravity();
         }
     }
-
+ 
     // ══════════════════════════════════════════════════
-    //  1. DETECTION CIRCLE
+    //  GRID GRAVITY (เหมือน PlayerController)
     // ══════════════════════════════════════════════════
-
-    /// <summary>
-    /// เช็คว่า Player อยู่ใน Detection Circle หรือไม่
-    /// </summary>
-    bool IsPlayerInDetectionRange()
+ 
+    void ApplyGridGravity()
     {
-        return Vector2.Distance(transform.position, player.position) <= detectionRadius;
-    }
-
-    // ══════════════════════════════════════════════════
-    //  2. ATTACK RAYCASTS
-    // ══════════════════════════════════════════════════
-
-    struct RaycastHitInfo
-    {
-        public bool hit;
-        public bool playerIsBehind;   // true = Player อยู่ด้านหลัง Enemy
-        public RaycastHit2D rayHit;
-    }
-
-    /// <summary>
-    /// ยิง 3 Raycast: ตรงหน้า / เฉียงหน้า / หลัง
-    /// คืนค่า HitInfo ตัวแรกที่โดน
-    /// </summary>
-    RaycastHitInfo CheckAttackRaycasts()
-    {
-        RaycastHitInfo info = new RaycastHitInfo();
-
-        // ทิศหลัก
-        Vector2 forward = new Vector2(facingDirection, 0f);
-        Vector2 backward = new Vector2(-facingDirection, 0f);
-
-        // Raycast 1: ตรงหน้า
-        RaycastHit2D front = Physics2D.Raycast(
-            transform.position, forward, attackRange, playerLayer
-        );
-
-        // Raycast 2: เฉียงหน้า (มุมลง)
-        float rad = diagonalAngle * Mathf.Deg2Rad;
-        Vector2 diagDir = new Vector2(
-            facingDirection * Mathf.Cos(rad),
-            -Mathf.Sin(rad)
-        );
-        RaycastHit2D diagonal = Physics2D.Raycast(
-            transform.position, diagDir, attackRange, playerLayer
-        );
-
-        // Raycast 3: หลัง
-        RaycastHit2D back = Physics2D.Raycast(
-            transform.position, backward, attackRange, playerLayer
-        );
-
-        if (front.collider != null)
+        for (int i = 0; i < 50; i++)
         {
-            info.hit = true;
-            info.playerIsBehind = false;
-            info.rayHit = front;
+            Vector3 below = new Vector3(transform.position.x, transform.position.y - cellSize, transform.position.z);
+            if (!HasFloorAt(below))
+            {
+                targetPosition = below;
+                isMoving = true;
+                return;
+            }
+            else break;
         }
-        else if (diagonal.collider != null)
-        {
-            info.hit = true;
-            info.playerIsBehind = false;
-            info.rayHit = diagonal;
-        }
-        else if (back.collider != null)
-        {
-            info.hit = true;
-            info.playerIsBehind = true;   // Player อยู่ด้านหลัง
-            info.rayHit = back;
-        }
-
-        return info;
     }
-
-    // ══════════════════════════════════════════════════
-    //  ATTACK + BACKSTEP
-    // ══════════════════════════════════════════════════
-
-    /// <summary>
-    /// โจมตี Player แล้วถอยหลัง 1 ช่อง
-    /// </summary>
-    void PerformAttack(RaycastHitInfo hitInfo)
+ 
+    bool IsObstacle(Vector3 position)
     {
-        attackTimer = attackCooldown;
-
-        // ถ้า Player อยู่ด้านหลัง → หันหน้าหาก่อนโจมตี
-        if (hitInfo.playerIsBehind)
+        // เช็คทั้ง Ground และ Platform — ป้องกันกรณี Platform อยู่ใน Layer Ground
+        return Physics2D.OverlapBox(
+            new Vector2(position.x, position.y + cellSize * 0.1f),
+            Vector2.one * (cellSize * 0.8f),
+            0f,
+            combinedLayer
+        ) != null;
+    }
+ 
+    bool HasFloorAt(Vector3 position)
+    {
+        Vector2 checkCenter = new Vector2(position.x, position.y - cellSize * 0.4f);
+        return Physics2D.OverlapBox(
+            checkCenter,
+            new Vector2(cellSize * 0.6f, cellSize * 0.2f),
+            0f,
+            combinedLayer
+        ) != null;
+    }
+ 
+    // ══════════════════════════════════════════════════
+    //  GRID MOVEMENT (Step Up เหมือน PlayerController)
+    // ══════════════════════════════════════════════════
+ 
+    /// <summary>
+    /// เดิน 1 ช่องไปทิศ dir พร้อม Step Up อัตโนมัติ
+    /// เหมือน TryMove() ใน PlayerController
+    /// </summary>
+    void TryMoveGrid(int dir)
+    {
+        if (isMoving) return;
+ 
+        Vector3 cur    = transform.position;
+        float   nextX  = cur.x + cellSize * dir;
+ 
+        // 1) Flat — ช่องข้างหน้าว่าง
+        Vector3 flatPos = new Vector3(nextX, cur.y, cur.z);
+        if (!IsObstacle(flatPos))
         {
-            TurnToFacePlayer();
+            targetPosition = flatPos;
+            isMoving = true;
+            return;
         }
-
-        // ส่ง Damage (ใช้ SendMessage หรือ Interface ตามต้องการ)
-        hitInfo.rayHit.collider.SendMessage(
-            "TakeDamage", attackDamage, SendMessageOptions.DontRequireReceiver
-        );
-
-        Debug.Log($"[Enemy] โจมตี! Damage = {attackDamage}" +
-                  (hitInfo.playerIsBehind ? " (Player อยู่ด้านหลัง)" : ""));
-
-        // ── 3. Backstep ─────────────────────────────
-        StartCoroutine(DoBackstep());
-    }
-
-    /// <summary>
-    /// ถอยหลัง 1 ช่อง หลังโจมตี
-    /// </summary>
-    System.Collections.IEnumerator DoBackstep()
-    {
-        isBackstepping = true;
-        yield return new WaitForSeconds(backstepDelay);
-
-        // ถอยหลัง = ตรงข้ามทิศที่หันหน้า
-        int backstepDir = -facingDirection;
-        Vector3 backstepTarget = new Vector3(
-            transform.position.x + cellSize * backstepDir,
-            transform.position.y,
-            transform.position.z
-        );
-
-        targetPosition = backstepTarget;
-        isMoving = true;
-
-        // รอจนถึงตำแหน่งแล้วค่อย unlock
-        yield return new WaitUntil(() => !isMoving);
-
-        isBackstepping = false;
-        moveTimer = moveInterval;   // หน่วงก่อนจะเดินตามอีกครั้ง
-
-        Debug.Log("[Enemy] ถอยหลัง 1 ช่อง");
-    }
-
-    // ══════════════════════════════════════════════════
-    //  CHASE LOGIC
-    // ══════════════════════════════════════════════════
-
-    /// <summary>
-    /// ตัดสินใจเดินตาม Player หรือหันหน้าหาก่อน
-    /// (อิง Logic ของ PlayerController: หันก่อน → ค่อยเดิน)
-    /// </summary>
-    void ChasePlayer()
-    {
-        float dx = player.position.x - transform.position.x;
-        if (Mathf.Abs(dx) < 0.01f) return;   // อยู่แถวเดียวกันแล้ว
-
-        int dirToPlayer = dx > 0 ? 1 : -1;
-
-        if (dirToPlayer == facingDirection)
+ 
+        // 2) Step Up — ช่องข้างหน้าบล็อค แต่ช่องบนว่าง
+        Vector3 stepPos = new Vector3(nextX, cur.y + cellSize, cur.z);
+        if (!IsObstacle(stepPos))
         {
-            // หันหน้าตรงกันแล้ว → เดิน 1 ช่อง
-            MoveOneCell(dirToPlayer);
-            moveTimer = moveInterval;
+            targetPosition = stepPos;
+            isMoving = true;
+            return;
+        }
+ 
+        // 3) บล็อคทั้งหมด → ไม่ขยับ
+    }
+ 
+    // ══════════════════════════════════════════════════
+    //  STATE: PATROL
+    // ══════════════════════════════════════════════════
+ 
+    void UpdatePatrol()
+    {
+        if (IsPlayerInRange(detectionRadius))
+        {
+            StartCoroutine(WakeUpAggro());
+            return;
+        }
+ 
+        if (isMoving || stepTimer > 0f) return;
+ 
+        float distFromOrigin = transform.position.x - patrolOriginX;
+        bool  atRightEdge    = distFromOrigin >= patrolRange * cellSize - 0.05f;
+        bool  atLeftEdge     = distFromOrigin <= -patrolRange * cellSize + 0.05f;
+ 
+        if ((patrolDirection == 1 && atRightEdge) || (patrolDirection == -1 && atLeftEdge))
+        {
+            StartCoroutine(PatrolTurn());
         }
         else
         {
-            // หันหน้าไม่ตรง → หันก่อน (ไม่เดิน — เหมือน PlayerController)
-            SetFacingDirection(dirToPlayer);
-            moveTimer = moveInterval * 0.5f;   // หน่วงสั้นกว่าก่อนเดิน
+            if (facingDirection != patrolDirection)
+                SetFacing(patrolDirection);
+            else
+                TryMoveGrid(patrolDirection);
+ 
+            stepTimer = patrolStepInterval;
         }
     }
-
-    // ══════════════════════════════════════════════════
-    //  GRID HELPERS
-    // ══════════════════════════════════════════════════
-
-    void MoveOneCell(int direction)
+ 
+    IEnumerator PatrolTurn()
     {
-        if (isMoving) return;
-
-        targetPosition = new Vector3(
-            transform.position.x + cellSize * direction,
-            transform.position.y,
-            transform.position.z
-        );
-        isMoving = true;
+        isBusy = true;
+        yield return new WaitForSeconds(patrolTurnPause);
+        patrolDirection = -patrolDirection;
+        SetFacing(patrolDirection);
+        isBusy    = false;
+        stepTimer = patrolStepInterval;
     }
-
-    void SetFacingDirection(int direction)
+ 
+    // ══════════════════════════════════════════════════
+    //  STATE: AGGRO
+    // ══════════════════════════════════════════════════
+ 
+    IEnumerator WakeUpAggro()
     {
-        facingDirection = direction;
-        if (spriteRenderer != null)
-            spriteRenderer.flipX = (direction == -1);
+        isBusy = true;
+        TurnToFacePlayer();
+        yield return new WaitForSeconds(aggroWakeDelay);
+        currentState = EnemyState.Aggro;
+        isBusy       = false;
     }
-
+ 
+    void UpdateAggro()
+    {
+        if (!IsPlayerInRange(deaggroRadius))
+        {
+            currentState = EnemyState.Patrol;
+            stepTimer    = patrolStepInterval;
+            return;
+        }
+ 
+        var hit = CheckAttackRaycasts();
+        if (hit.collider != null && attackTimer <= 0f)
+        {
+            StartCoroutine(PerformAttack(hit));
+            return;
+        }
+ 
+        if (isMoving || stepTimer > 0f) return;
+ 
+        ChasePlayer();
+        stepTimer = aggroStepInterval;
+    }
+ 
+    void ChasePlayer()
+    {
+        float dx       = player.position.x - transform.position.x;
+        int   dirNeeded = dx > 0 ? 1 : -1;
+ 
+        if (Mathf.Abs(dx) < cellSize * 0.5f) return;
+ 
+        if (facingDirection != dirNeeded)
+        {
+            SetFacing(dirNeeded);
+            return;
+        }
+ 
+        // ใช้ TryMoveGrid แทน Physics Jump
+        // Step Up จะทำงานอัตโนมัติถ้าช่องข้างหน้าบล็อค
+        TryMoveGrid(dirNeeded);
+    }
+ 
+    // ══════════════════════════════════════════════════
+    //  ATTACK RAYCASTS
+    // ══════════════════════════════════════════════════
+ 
+    RaycastHit2D CheckAttackRaycasts()
+    {
+        var   origin  = (Vector2)transform.position;
+        float rad     = diagonalAngle * Mathf.Deg2Rad;
+        var   forward = new Vector2(facingDirection, 0f);
+        var   back    = new Vector2(-facingDirection, 0f);
+        var   diag    = new Vector2(facingDirection * Mathf.Cos(rad), -Mathf.Sin(rad));
+ 
+        var h = Physics2D.Raycast(origin, forward, attackRange, playerLayer);
+        if (h.collider != null) return h;
+ 
+        h = Physics2D.Raycast(origin, diag, attackRange, playerLayer);
+        if (h.collider != null) return h;
+ 
+        h = Physics2D.Raycast(origin, back, attackRange, playerLayer);
+        if (h.collider != null) { TurnToFacePlayer(); return h; }
+ 
+        return default;
+    }
+ 
+    // ══════════════════════════════════════════════════
+    //  ATTACK + BACKSTEP
+    // ══════════════════════════════════════════════════
+ 
+    IEnumerator PerformAttack(RaycastHit2D hit)
+    {
+        isBusy       = true;
+        currentState = EnemyState.Attack;
+        attackTimer  = attackCooldown;
+ 
+        yield return new WaitForSeconds(attackWindup);
+ 
+        hit.collider.SendMessage("TakeDamage", attackDamage, SendMessageOptions.DontRequireReceiver);
+        Debug.Log($"[Enemy] โจมตี {attackDamage} dmg");
+ 
+        currentState = EnemyState.Backstep;
+        yield return new WaitForSeconds(backstepDelay);
+ 
+        // Backstep ใช้ TryMoveGrid ถอยหลัง
+        TryMoveGrid(-facingDirection);
+        yield return new WaitUntil(() => !isMoving);
+ 
+        currentState = IsPlayerInRange(detectionRadius) ? EnemyState.Aggro : EnemyState.Patrol;
+        stepTimer    = aggroStepInterval;
+        isBusy       = false;
+    }
+ 
+    // ══════════════════════════════════════════════════
+    //  HELPERS
+    // ══════════════════════════════════════════════════
+ 
+    bool IsPlayerInRange(float radius)
+        => player != null && Vector2.Distance(transform.position, player.position) <= radius;
+ 
+    void SetFacing(int dir)
+    {
+        facingDirection = dir;
+        if (sr != null) sr.flipX = (dir == -1);
+    }
+ 
     void TurnToFacePlayer()
     {
-        float dx = player.position.x - transform.position.x;
-        SetFacingDirection(dx >= 0 ? 1 : -1);
+        if (player == null) return;
+        SetFacing(player.position.x >= transform.position.x ? 1 : -1);
     }
-
-    Vector3 SnapToGrid(Vector3 position)
-    {
-        return new Vector3(
-            Mathf.Round(position.x / cellSize) * cellSize,
-            Mathf.Round(position.y / cellSize) * cellSize,
-            position.z
-        );
-    }
-
+ 
+    Vector3 SnapToGrid(Vector3 p)
+        => new Vector3(
+            Mathf.Round(p.x / cellSize) * cellSize,
+            Mathf.Round(p.y / cellSize) * cellSize,
+            p.z);
+ 
     // ══════════════════════════════════════════════════
-    //  GIZMOS (Scene View)
+    //  PUBLIC API
     // ══════════════════════════════════════════════════
-
+ 
+    public EnemyState GetState()  => currentState;
+    public bool       IsAggro()   => currentState == EnemyState.Aggro || currentState == EnemyState.Attack;
+    public int        GetFacing() => facingDirection;
+ 
+    // ══════════════════════════════════════════════════
+    //  GIZMOS
+    // ══════════════════════════════════════════════════
+ 
     void OnDrawGizmosSelected()
     {
-        // 1. Detection Circle
-        Gizmos.color = new Color(0f, 1f, 0f, 0.25f);
+        // Detection
+        Gizmos.color = new Color(0.2f, 1f, 0.2f, 0.12f);
         Gizmos.DrawSphere(transform.position, detectionRadius);
         Gizmos.color = Color.green;
         Gizmos.DrawWireSphere(transform.position, detectionRadius);
-
-        // 2. Attack Raycasts
-        Vector3 forward = new Vector3(facingDirection, 0f, 0f);
-        Vector3 backward = new Vector3(-facingDirection, 0f, 0f);
-        float rad = diagonalAngle * Mathf.Deg2Rad;
-        Vector3 diagDir = new Vector3(
-            facingDirection * Mathf.Cos(rad),
-            -Mathf.Sin(rad),
-            0f
-        );
-
-        Gizmos.color = Color.red;
-        Gizmos.DrawRay(transform.position, forward * attackRange);     // หน้า
-
-        Gizmos.color = new Color(1f, 0.5f, 0f);
-        Gizmos.DrawRay(transform.position, diagDir * attackRange);     // เฉียงหน้า
-
+ 
+        // Deaggro
         Gizmos.color = Color.yellow;
-        Gizmos.DrawRay(transform.position, backward * attackRange);    // หลัง
-
-        // Label Gizmo hint
-        Gizmos.color = Color.white;
-        Gizmos.DrawWireSphere(
-            transform.position + forward * attackRange, 0.05f
-        );
+        Gizmos.DrawWireSphere(transform.position, deaggroRadius);
+ 
+        // Patrol range
+        float ox = Application.isPlaying ? patrolOriginX : transform.position.x;
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawLine(
+            new Vector3(ox - patrolRange * cellSize, transform.position.y),
+            new Vector3(ox + patrolRange * cellSize, transform.position.y));
+ 
+        // Attack rays
+        int   fd  = Application.isPlaying ? facingDirection : 1;
+        float rad = diagonalAngle * Mathf.Deg2Rad;
+        Gizmos.color = Color.red;
+        Gizmos.DrawRay(transform.position, new Vector3(fd, 0f) * attackRange);
+        Gizmos.color = new Color(1f, 0.5f, 0f);
+        Gizmos.DrawRay(transform.position, new Vector3(fd * Mathf.Cos(rad), -Mathf.Sin(rad)) * attackRange);
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawRay(transform.position, new Vector3(-fd, 0f) * attackRange);
+ 
+        // Step Up check zones (ม่วง)
+        float nx = transform.position.x + cellSize * fd;
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireCube(new Vector3(nx, transform.position.y, 0), Vector3.one * (cellSize * 0.8f));
+        Gizmos.color = new Color(1f, 0f, 1f, 0.5f);
+        Gizmos.DrawWireCube(new Vector3(nx, transform.position.y + cellSize, 0), Vector3.one * (cellSize * 0.8f));
     }
 }
