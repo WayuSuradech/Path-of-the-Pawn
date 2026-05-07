@@ -2,63 +2,140 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// PlayerHealth - จัดการการตายของ Player
-/// แนบ Script นี้ที่ Player
+/// PlayerHealth — จัดการ HP และการตายของ Player
+/// 
+/// ปรับปรุงจากเดิม: ตายแล้ว Respawn กลับจุดเซฟล่าสุด
+/// โดยอัตโนมัติผ่าน SaveSystem
 /// </summary>
 public class PlayerHealth : MonoBehaviour
 {
+    [Header("Health")]
+    public float maxHP = 100f;
+    public float currentHP;
+
     [Header("Death Settings")]
     [Tooltip("หน่วงเวลากี่วินาทีก่อน Respawn")]
     public float deathDelay = 1f;
 
-    [Tooltip("Respawn แบบไหน?")]
-    public RespawnType respawnType = RespawnType.ReloadScene;
+    [Header("Respawn Fallback")]
+    [Tooltip("ถ้าไม่มี Save File จะ Respawn ที่จุดนี้แทน")]
+    public Transform defaultRespawnPoint;
 
-    [Header("Respawn Point (ถ้าเลือก RespawnAtPoint)")]
-    public Transform respawnPoint;
+    // ── State ─────────────────────────────────────────
+    private bool isDead = false;
 
-    public enum RespawnType
+    void Awake()
     {
-        ReloadScene,    // โหลด Scene ใหม่
-        RespawnAtPoint  // กลับไปที่จุด Respawn
+        currentHP = maxHP;
     }
 
-    private bool isDead = false;
+    // ══════════════════════════════════════════════════
+    //  DAMAGE / HEAL
+    // ══════════════════════════════════════════════════
+
+    /// <summary>
+    /// รับ Damage — ถูกเรียกจาก Enemy ผ่าน SendMessage("TakeDamage", amount)
+    /// </summary>
+    public void TakeDamage(float amount)
+    {
+        if (isDead) return;
+
+        currentHP -= amount;
+        currentHP = Mathf.Max(currentHP, 0f);
+
+        Debug.Log($"[PlayerHealth] HP: {currentHP}/{maxHP}");
+
+        if (currentHP <= 0f)
+            Die();
+    }
+
+    public void Heal(float amount)
+    {
+        if (isDead) return;
+        currentHP = Mathf.Min(currentHP + amount, maxHP);
+    }
+
+    // ══════════════════════════════════════════════════
+    //  DEATH / RESPAWN
+    // ══════════════════════════════════════════════════
 
     public void Die()
     {
         if (isDead) return;
         isDead = true;
 
-        // ปิดการควบคุม Player
-        PlayerController pc = GetComponent<PlayerController>();
+        // ปิดการควบคุม
+        var pc = GetComponent<PlayerController>();
         if (pc != null) pc.enabled = false;
 
-        // เล่น animation ตาย (ถ้ามี)
-        Animator anim = GetComponent<Animator>();
+        // Trigger animation (ถ้ามี)
+        var anim = GetComponent<Animator>();
         if (anim != null) anim.SetTrigger("Die");
 
-        // รอแล้ว Respawn
+        Debug.Log("[PlayerHealth] Player ตาย → รอ Respawn");
+
         Invoke(nameof(Respawn), deathDelay);
     }
 
     void Respawn()
     {
-        if (respawnType == RespawnType.ReloadScene)
+        var data = SaveSystem.Load();
+
+        if (data != null)
         {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            // ── มี Save File → โหลด Scene ที่เซฟ แล้ว Spawn ที่จุดเซฟ ──
+            string currentScene = SceneManager.GetActiveScene().name;
+
+            if (data.sceneName == currentScene)
+            {
+                // Scene เดิม → ย้ายตำแหน่งตรงๆ ไม่ต้องโหลด Scene ใหม่
+                RespawnAtSavedPosition(data);
+            }
+            else
+            {
+                // Scene ต่างกัน → โหลด Scene ใหม่ แล้วให้ RespawnOnLoad จัดการ
+                RespawnOnLoad.pendingRespawn = true;
+                SceneManager.LoadScene(data.sceneName);
+            }
         }
-        else if (respawnType == RespawnType.RespawnAtPoint)
+        else
         {
-            if (respawnPoint != null)
-                transform.position = respawnPoint.position;
-
-            isDead = false;
-
-            PlayerController pc = GetComponent<PlayerController>();
-            if (pc != null) pc.enabled = true;
+            // ── ไม่มี Save File → ใช้ Default Respawn Point ──
+            if (defaultRespawnPoint != null)
+            {
+                RespawnAtPosition(defaultRespawnPoint.position);
+            }
+            else
+            {
+                // โหลด Scene ใหม่ตั้งแต่ต้น
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            }
         }
     }
 
+    void RespawnAtSavedPosition(SaveSystem.SaveData data)
+    {
+        RespawnAtPosition(new Vector3(data.posX, data.posY, 0f));
+        Debug.Log($"[PlayerHealth] Respawn ที่จุด '{data.savePointID}'");
+    }
+
+    void RespawnAtPosition(Vector3 pos)
+    {
+        transform.position = pos;
+        currentHP = maxHP;
+        isDead = false;
+
+        var pc = GetComponent<PlayerController>();
+        if (pc != null) pc.enabled = true;
+
+        var rb = GetComponent<Rigidbody2D>();
+        if (rb != null) rb.linearVelocity = Vector2.zero;
+    }
+
+    // ══════════════════════════════════════════════════
+    //  PUBLIC HELPERS
+    // ══════════════════════════════════════════════════
+
     public bool IsDead() => isDead;
+    public float GetHPPercent() => currentHP / maxHP;
 }
