@@ -1887,21 +1887,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PuzzleManager
   puzzles:
-  - puzzleName: 03
-    keyItem: {fileID: 476508033}
-    button: {fileID: 1229392695}
-    bridge: {fileID: 1058963391}
-    bridgeExtendedPosition: {x: 69, y: 2.5, z: 0}
+  - puzzleName: 01
+    keyItem: {fileID: 2113601972}
+    button: {fileID: 2054268668}
+    bridge: {fileID: 707227271}
+    bridgeExtendedPosition: {x: 18, y: 0.5, z: 0}
     bridgeSpeed: 5
-    buttonRaisedPosition: {x: 68, y: -0.5, z: 0}
-    buttonSpeed: 1
+    buttonRaisedPosition: {x: 22, y: 5, z: 0}
+    buttonSpeed: 4
     activationDelay: 0.1
     isActivated: 0
     canReceiveCollision: 0
     isButtonRising: 0
     isBridgeMoving: 0
     isBridgeDone: 0
-  - puzzleName: 02
+  - puzzleName: 03
     keyItem: {fileID: 476508033}
     button: {fileID: 1229392695}
     bridge: {fileID: 1058963391}
@@ -2216,7 +2216,6 @@ GameObject:
   m_Component:
   - component: {fileID: 707227272}
   - component: {fileID: 707227275}
-  - component: {fileID: 707227274}
   - component: {fileID: 707227273}
   m_Layer: 7
   m_Name: Bridge01
@@ -2286,20 +2285,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &707227274
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 707227271}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 53c9665699c6bc14aa02dc704f75a4ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Bridge
-  extendedPosition: {x: 18, y: 0.5, z: 0}
-  moveSpeed: 3
 --- !u!212 &707227275
 SpriteRenderer:
   serializedVersion: 2
@@ -9976,7 +9961,6 @@ GameObject:
   m_Component:
   - component: {fileID: 2054268669}
   - component: {fileID: 2054268670}
-  - component: {fileID: 2054268672}
   - component: {fileID: 2054268674}
   - component: {fileID: 2054268673}
   m_Layer: 0
@@ -10060,24 +10044,6 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
---- !u!114 &2054268672
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2054268668}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5ea52d2567218e549a0226b61c1505f5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ButtonBlock
-  bridge: {fileID: 707227274}
-  raisedPosition: {x: 22, y: 5, z: 0}
-  riseSpeed: 3
-  normalColor: {r: 1, g: 0, b: 0, a: 1}
-  activatedColor: {r: 0.6, g: 0, b: 0, a: 1}
-  activationDelay: 0.5
 --- !u!50 &2054268673
 Rigidbody2D:
   serializedVersion: 5
