@@ -1266,7 +1266,6 @@ GameObject:
   - component: {fileID: 476508034}
   - component: {fileID: 476508037}
   - component: {fileID: 476508036}
-  - component: {fileID: 476508038}
   m_Layer: 0
   m_Name: Deadbody
   m_TagString: PushableBlock
@@ -1412,22 +1411,6 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
---- !u!114 &476508038
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 476508033}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b841f53e293ca22479b538ed9e063442, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PushableBlock
-  pushForce: 20
-  interactRange: 1.5
-  linearDrag: 3
-  interactPrompt: {fileID: 0}
 --- !u!4 &526978562 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8543271970925912462, guid: a8ed54f16c70ff849a099a57c7a72395, type: 3}
@@ -1873,6 +1856,79 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 598069967}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &666479605
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 666479607}
+  - component: {fileID: 666479606}
+  m_Layer: 0
+  m_Name: PuzzleManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &666479606
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 666479605}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6d4e20878079620469f88836151c1e73, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PuzzleManager
+  puzzles:
+  - puzzleName: 03
+    keyItem: {fileID: 476508033}
+    button: {fileID: 1229392695}
+    bridge: {fileID: 1058963391}
+    bridgeExtendedPosition: {x: 69, y: 2.5, z: 0}
+    bridgeSpeed: 5
+    buttonRaisedPosition: {x: 68, y: -0.5, z: 0}
+    buttonSpeed: 1
+    activationDelay: 0.1
+    isActivated: 0
+    canReceiveCollision: 0
+    isButtonRising: 0
+    isBridgeMoving: 0
+    isBridgeDone: 0
+  - puzzleName: 02
+    keyItem: {fileID: 476508033}
+    button: {fileID: 1229392695}
+    bridge: {fileID: 1058963391}
+    bridgeExtendedPosition: {x: 69, y: 2.5, z: 0}
+    bridgeSpeed: 5
+    buttonRaisedPosition: {x: 68, y: -0.5, z: 0}
+    buttonSpeed: 1
+    activationDelay: 0.1
+    isActivated: 0
+    canReceiveCollision: 0
+    isButtonRising: 0
+    isBridgeMoving: 0
+    isBridgeDone: 0
+--- !u!4 &666479607
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 666479605}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -32.94382, y: 0.84972, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &681812739
 GameObject:
@@ -6028,7 +6084,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1058963392}
   - component: {fileID: 1058963395}
-  - component: {fileID: 1058963394}
   - component: {fileID: 1058963393}
   m_Layer: 7
   m_Name: Bridge02
@@ -6098,20 +6153,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &1058963394
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1058963391}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 53c9665699c6bc14aa02dc704f75a4ff, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Bridge
-  extendedPosition: {x: 69, y: 2.5, z: 0}
-  moveSpeed: 3
 --- !u!212 &1058963395
 SpriteRenderer:
   serializedVersion: 2
@@ -6614,7 +6655,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1229392696}
   - component: {fileID: 1229392700}
-  - component: {fileID: 1229392699}
   - component: {fileID: 1229392698}
   - component: {fileID: 1229392697}
   m_Layer: 0
@@ -6712,24 +6752,6 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 1}
   m_EdgeRadius: 0
---- !u!114 &1229392699
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1229392695}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5ea52d2567218e549a0226b61c1505f5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ButtonBlock
-  bridge: {fileID: 1058963394}
-  raisedPosition: {x: 68, y: -0.5, z: 0}
-  riseSpeed: 3
-  normalColor: {r: 1, g: 0, b: 0, a: 1}
-  activatedColor: {r: 1, g: 1, b: 1, a: 1}
-  activationDelay: 0.5
 --- !u!212 &1229392700
 SpriteRenderer:
   serializedVersion: 2
@@ -10881,3 +10903,4 @@ SceneRoots:
   - {fileID: 1058359314}
   - {fileID: 1518831943}
   - {fileID: 1160092195}
+  - {fileID: 666479607}
