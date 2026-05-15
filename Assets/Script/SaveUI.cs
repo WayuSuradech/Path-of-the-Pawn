@@ -18,15 +18,16 @@ public class SaveUI : MonoBehaviour
 {
     [Header("── Save Prompt (ตอนยืนที่จุดเซฟ) ──")]
     public GameObject savePromptPanel;
+
     public TextMeshProUGUI savePromptText;
 
-    [Header("── Saved Feedback ──")]
-    public GameObject savedFeedbackPanel;
+    [Header("── Saved Feedback ──")] public GameObject savedFeedbackPanel;
     public TextMeshProUGUI savedFeedbackText;
     public float feedbackDuration = 2f;
 
     [Header("── Main Menu / Load Screen ──")]
     public GameObject mainMenuPanel;
+
     public TextMeshProUGUI lastSaveInfoText;
     public Button continueButton;
     public Button newGameButton;
@@ -142,6 +143,7 @@ public class SaveUI : MonoBehaviour
 
     void OnContinueClicked()
     {
+        Time.timeScale = 1f;
         var data = SaveSystem.Load();
         if (data == null) return;
 
@@ -155,6 +157,7 @@ public class SaveUI : MonoBehaviour
 
     void OnNewGameClicked()
     {
+        Time.timeScale = 1f;
         mainMenuPanel.SetActive(false);
         // โหลด Scene แรก (index 0) — ปรับเป็น Scene ที่ต้องการ
         UnityEngine.SceneManagement.SceneManager.LoadScene(1);
@@ -163,7 +166,7 @@ public class SaveUI : MonoBehaviour
     void OnDeleteSaveClicked()
     {
         SaveSystem.DeleteSave();
-        SetupMainMenu();   // refresh UI
+        SetupMainMenu(); // refresh UI
     }
 
     // ══════════════════════════════════════════════════
@@ -176,12 +179,20 @@ public class SaveUI : MonoBehaviour
         {
             mainMenuPanel.SetActive(true);
             SetupMainMenu();
+
+            // --- หยุดเวลาเกม ---
+            Time.timeScale = 0f;
         }
     }
 
     public void HideMainMenu()
     {
         if (mainMenuPanel != null)
+        {
             mainMenuPanel.SetActive(false);
+
+            // --- ให้เกมกลับมาเดินต่อ ---
+            Time.timeScale = 1f;
+        }
     }
 }
