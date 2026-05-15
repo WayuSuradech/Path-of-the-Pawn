@@ -3302,6 +3302,8 @@ MonoBehaviour:
   savePointID: test_03
   autoSave: 0
   displayName: Third
+  saveSound: {fileID: 8300000, guid: bdfbe3c258a6e2c41a5446485027f039, type: 3}
+  saveVolume: 0.5
   spriteRenderer: {fileID: 0}
   inactiveColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   activeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
@@ -5112,6 +5114,8 @@ MonoBehaviour:
   savePointID: test_01
   autoSave: 0
   displayName: First
+  saveSound: {fileID: 8300000, guid: bdfbe3c258a6e2c41a5446485027f039, type: 3}
+  saveVolume: 0.5
   spriteRenderer: {fileID: 0}
   inactiveColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   activeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
@@ -5210,6 +5214,8 @@ MonoBehaviour:
   savePointID: test_02
   autoSave: 0
   displayName: Second
+  saveSound: {fileID: 8300000, guid: bdfbe3c258a6e2c41a5446485027f039, type: 3}
+  saveVolume: 0.5
   spriteRenderer: {fileID: 0}
   inactiveColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   activeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
@@ -10539,6 +10545,8 @@ MonoBehaviour:
   savePointID: test_04
   autoSave: 0
   displayName: Fourth
+  saveSound: {fileID: 8300000, guid: bdfbe3c258a6e2c41a5446485027f039, type: 3}
+  saveVolume: 0.5
   spriteRenderer: {fileID: 0}
   inactiveColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   activeColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
@@ -22345,6 +22353,8 @@ MonoBehaviour:
   maxHP: 100
   currentHP: 0
   deathDelay: 0
+  deathSound: {fileID: 8300000, guid: a316eb70f09fdff4eb53ed00d77b4103, type: 3}
+  deathVolume: 0.5
   defaultRespawnPoint: {fileID: 2083598492}
 --- !u!114 &2083598496
 MonoBehaviour:
@@ -22378,6 +22388,10 @@ MonoBehaviour:
     m_Bits: 64
   attackWindup: 0.08
   attackVFX: {fileID: 1865156510}
+  attackSound: {fileID: 8300000, guid: 459e5fb3d1187c6408926154363250ad, type: 3}
+  attackVolume: 0.2
+  hitSound: {fileID: 0}
+  hitVolume: 1
 --- !u!1 &2084100248
 GameObject:
   m_ObjectHideFlags: 0

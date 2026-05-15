@@ -23,6 +23,12 @@ public class SavePoint : MonoBehaviour
     [Tooltip("ชื่อที่แสดงใน UI เช่น 'ทางเข้าถ้ำ'")]
     public string displayName = "จุดบันทึก";
 
+    [Header("Audio Settings")]
+    [Tooltip("ไฟล์เสียงเวลาบันทึกสำเร็จ")]
+    public AudioClip saveSound;
+    [Range(0f, 1f)] public float saveVolume = 1f;
+    private AudioSource audioSource;
+
     [Header("Visual Feedback")]
     public SpriteRenderer spriteRenderer;
     public Color inactiveColor = new Color(0.5f, 0.5f, 0.5f);
@@ -35,6 +41,10 @@ public class SavePoint : MonoBehaviour
 
     void Start()
     {
+        // เตรียม AudioSource
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
+
         if (spriteRenderer != null)
             spriteRenderer.color = inactiveColor;
 
@@ -99,6 +109,10 @@ public class SavePoint : MonoBehaviour
     {
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player == null) return;
+
+        // เล่นเสียงเมื่อทำการเซฟ
+        if (saveSound != null && audioSource != null)
+            audioSource.PlayOneShot(saveSound, saveVolume);
 
         SaveSystem.Save(this, player.transform.position);
 

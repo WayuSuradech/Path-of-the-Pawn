@@ -35,6 +35,17 @@ public class PlayerAttack : MonoBehaviour
     [Tooltip("GameObject ที่แสดง HitBox ขณะโจมตี (optional)")]
     public GameObject attackVFX;
 
+    [Header("Audio Settings")]
+    [Tooltip("ไฟล์เสียงตอนเหวี่ยงอาวุธ")]
+    public AudioClip attackSound;
+    [Range(0f, 1f)] public float attackVolume = 1f;
+
+    [Tooltip("ไฟล์เสียงตอนตีโดนศัตรู")]
+    public AudioClip hitSound;
+    [Range(0f, 1f)] public float hitVolume = 1f;
+
+    private AudioSource audioSource;
+
     // ── Private ──────────────────────────────────────
     private PlayerController pc;
     private float cooldownTimer = 0f;
@@ -47,6 +58,9 @@ public class PlayerAttack : MonoBehaviour
     void Awake()
     {
         pc = GetComponent<PlayerController>();
+        // เพิ่ม AudioSource อัตโนมัติถ้าไม่มี
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
     }
 
     void Update()
@@ -72,6 +86,9 @@ public class PlayerAttack : MonoBehaviour
         var anim = GetComponent<Animator>();
         if (anim != null) anim.SetTrigger("Attack");
 
+        // เล่นเสียงเหวี่ยงอาวุธพร้อมปรับ Volume
+        if (attackSound != null) audioSource.PlayOneShot(attackSound, attackVolume);
+
         // รอ Windup
         if (attackWindup > 0f)
             yield return new WaitForSeconds(attackWindup);
@@ -91,15 +108,19 @@ public class PlayerAttack : MonoBehaviour
         Vector2 boxSize = new Vector2(cellSize * 0.9f, cellSize * 0.9f);
         Collider2D[] hits = Physics2D.OverlapBoxAll(hitCenter, boxSize, 0f, enemyLayer);
 
+        if (hits.Length > 0)
+        {
+            // เล่นเสียงเมื่อตีโดนศัตรูพร้อมปรับ Volume
+            if (hitSound != null) audioSource.PlayOneShot(hitSound, hitVolume);
+            Debug.Log($"[PlayerAttack] ตีโดน {hits.Length} ตัว, damage = {attackDamage}");
+        }
+
         foreach (var col in hits)
         {
             var enemyHP = col.GetComponent<EnemyHealth>();
             if (enemyHP != null)
                 enemyHP.TakeDamage(attackDamage, facing);  // ส่งทิศให้ Knockback
         }
-
-        if (hits.Length > 0)
-            Debug.Log($"[PlayerAttack] ตีโดน {hits.Length} ตัว, damage = {attackDamage}");
 
         isAttacking = false;
     }

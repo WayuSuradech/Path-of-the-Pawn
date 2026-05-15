@@ -17,6 +17,12 @@ public class PlayerHealth : MonoBehaviour
     [Tooltip("หน่วงเวลากี่วินาทีก่อน Respawn")]
     public float deathDelay = 1f;
 
+    [Header("Audio Settings")]
+    [Tooltip("ไฟล์เสียงเวลาตัวละครตาย")]
+    public AudioClip deathSound;
+    [Range(0f, 1f)] public float deathVolume = 1f;
+    private AudioSource audioSource;
+
     [Header("Respawn Fallback")]
     [Tooltip("ถ้าไม่มี Save File จะ Respawn ที่จุดนี้แทน")]
     public Transform defaultRespawnPoint;
@@ -27,6 +33,9 @@ public class PlayerHealth : MonoBehaviour
     void Awake()
     {
         currentHP = maxHP;
+        // เตรียม AudioSource
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
     }
 
     // ══════════════════════════════════════════════════
@@ -63,6 +72,10 @@ public class PlayerHealth : MonoBehaviour
     {
         if (isDead) return;
         isDead = true;
+
+        // เล่นเสียงตาย
+        if (deathSound != null && audioSource != null)
+            audioSource.PlayOneShot(deathSound, deathVolume);
 
         // ปิดการควบคุม
         var pc = GetComponent<PlayerController>();
