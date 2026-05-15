@@ -1,12 +1,5 @@
 fileFormatVersion: 2
-guid: 9a48552680495754082bc69605e2adc3
-AssetOrigin:
-  serializedVersion: 1
-  productId: 285953
-  packageName: Game Input Controller Icons Free
-  packageVersion: 1.0
-  assetPath: Assets/GameInputControllerIconsFree/keyboard/keyboard-outlined/keyboard-wasd.png
-  uploadId: 732895
+guid: 82292ddb8ffc8c94080c70ecb6009764
 TextureImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -56,7 +49,7 @@ TextureImporter:
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
-  spriteBorder: {x: 176, y: 116, z: 179, w: 238}
+  spriteBorder: {x: 0, y: 0, z: 176, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1

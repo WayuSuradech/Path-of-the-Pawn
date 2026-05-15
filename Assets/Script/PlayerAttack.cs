@@ -3,13 +3,6 @@ using UnityEngine;
 
 /// <summary>
 /// PlayerAttack — ระบบโจมตีแบบ Grid
-///
-/// ตี 1 ช่องตรงหน้า Player (ทิศที่หันอยู่)
-/// ใช้ OverlapBox เช็ค Collider ใน cell นั้น
-/// 
-/// Setup:
-///   - ใส่ Script นี้บน Player GameObject เดียวกับ PlayerController
-///   - ตั้ง enemyLayer ให้ตรงกับ Layer ของ Enemy
 /// </summary>
 [RequireComponent(typeof(PlayerController))]
 public class PlayerAttack : MonoBehaviour
@@ -34,6 +27,8 @@ public class PlayerAttack : MonoBehaviour
     [Header("Visual Feedback")]
     [Tooltip("GameObject ที่แสดง HitBox ขณะโจมตี (optional)")]
     public GameObject attackVFX;
+    [Tooltip("ให้ VFX หันตามทิศทางที่ตัวละครหันหน้าหรือไม่")]
+    public bool flipVFXWithPlayer = true;
 
     [Header("Audio Settings")]
     [Tooltip("ไฟล์เสียงตอนเหวี่ยงอาวุธ")]
@@ -58,7 +53,6 @@ public class PlayerAttack : MonoBehaviour
     void Awake()
     {
         pc = GetComponent<PlayerController>();
-        // เพิ่ม AudioSource อัตโนมัติถ้าไม่มี
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null) audioSource = gameObject.AddComponent<AudioSource>();
     }
@@ -82,35 +76,28 @@ public class PlayerAttack : MonoBehaviour
         isAttacking   = true;
         cooldownTimer = attackCooldown;
 
-        // Trigger animation windup (ถ้ามี Animator)
         var anim = GetComponent<Animator>();
         if (anim != null) anim.SetTrigger("Attack");
 
-        // เล่นเสียงเหวี่ยงอาวุธพร้อมปรับ Volume
         if (attackSound != null) audioSource.PlayOneShot(attackSound, attackVolume);
 
-        // รอ Windup
         if (attackWindup > 0f)
             yield return new WaitForSeconds(attackWindup);
 
-        // คำนวณตำแหน่ง cell ข้างหน้า
         int     facing    = pc.GetFacingDirection();
         Vector2 hitCenter = new Vector2(
             transform.position.x + cellSize * facing,
             transform.position.y
         );
 
-        // แสดง VFX
         if (attackVFX != null)
-            StartCoroutine(ShowVFX(hitCenter));
+            StartCoroutine(ShowVFX(hitCenter, facing)); // ส่งค่าทิศทางไปที่ VFX
 
-        // OverlapBox เช็ค Enemy ใน cell นั้น
         Vector2 boxSize = new Vector2(cellSize * 0.9f, cellSize * 0.9f);
         Collider2D[] hits = Physics2D.OverlapBoxAll(hitCenter, boxSize, 0f, enemyLayer);
 
         if (hits.Length > 0)
         {
-            // เล่นเสียงเมื่อตีโดนศัตรูพร้อมปรับ Volume
             if (hitSound != null) audioSource.PlayOneShot(hitSound, hitVolume);
             Debug.Log($"[PlayerAttack] ตีโดน {hits.Length} ตัว, damage = {attackDamage}");
         }
@@ -119,23 +106,28 @@ public class PlayerAttack : MonoBehaviour
         {
             var enemyHP = col.GetComponent<EnemyHealth>();
             if (enemyHP != null)
-                enemyHP.TakeDamage(attackDamage, facing);  // ส่งทิศให้ Knockback
+                enemyHP.TakeDamage(attackDamage, facing);
         }
 
         isAttacking = false;
     }
 
-    IEnumerator ShowVFX(Vector2 pos)
+    IEnumerator ShowVFX(Vector2 pos, int facing)
     {
         attackVFX.transform.position = pos;
+
+        // --- ส่วนที่เพิ่มสำหรับ Flip VFX ---
+        if (flipVFXWithPlayer)
+        {
+            // ปรับ scale ของ VFX ตามทิศทางที่หัน (1 หรือ -1)
+            attackVFX.transform.localScale = new Vector3(facing, 1, 1);
+        }
+        // --------------------------------
+
         attackVFX.SetActive(true);
         yield return new WaitForSeconds(0.1f);
         attackVFX.SetActive(false);
     }
-
-    // ══════════════════════════════════════════════════
-    //  GIZMO — แสดง HitBox ใน Scene View
-    // ══════════════════════════════════════════════════
 
     void OnDrawGizmosSelected()
     {
@@ -149,7 +141,6 @@ public class PlayerAttack : MonoBehaviour
             0f
         );
 
-        // สีแดงโปร่งแสง = zone โจมตี
         Gizmos.color = new Color(1f, 0f, 0f, 0.35f);
         Gizmos.DrawCube(hitCenter, new Vector3(cellSize * 0.9f, cellSize * 0.9f, 0.1f));
 
