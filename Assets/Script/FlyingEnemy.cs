@@ -1,109 +1,154 @@
 using UnityEngine;
-
+ 
 /// <summary>
 /// FlyingEnemy - ม้าบินตาม Waypoints วน Loop
-/// 
-/// วิธีใช้:
-///   1. แนบ Script นี้ที่ม้า
-///   2. ตั้ง Waypoints ใน Inspector (ลาก Transform หลายๆ จุดมาใส่)
-///   3. ปรับ moveSpeed ตามต้องการ
-///   4. ม้าจะบินวน Loop ผ่านทุก Waypoint ไปเรื่อยๆ
-///   5. ชน Player → Player ตาย
+///
+/// useTurnSystem = true  → บินตาม Player Turn (ค่อยๆ พุ่งไปทีละจุด)
+/// useTurnSystem = false → บินอิสระ Update ปกติ
 /// </summary>
-public class FlyingEnemy : MonoBehaviour
+public class FlyingEnemy : MonoBehaviour, ITurnTaker
 {
     [Header("Waypoints")]
     [Tooltip("ลาก Empty GameObject หลายๆ จุดมาใส่เป็นเส้นทางบิน")]
     public Transform[] waypoints;
-
+ 
     [Header("Movement")]
     public float moveSpeed = 3f;
-
-    [Tooltip("หันหน้าตามทิศที่บินไหม?")]
-    public bool flipSprite = true;
-
-    private int currentWaypointIndex = 0;
+    public bool  flipSprite = true;
+ 
+    [Header("Turn Settings")]
+    [Tooltip("เปิด → บินตาม Player Turn (ค่อยๆ พุ่งไปทีละจุด)\nปิด → บินอิสระแบบปกติ")]
+    public bool useTurnSystem = false;
+ 
+    private int            currentWaypointIndex = 0;
     private SpriteRenderer sr;
-
+    private bool           isMovingToWaypoint   = false;
+ 
+    // ══════════════════════════════════════════════
+    //  UNITY
+    // ══════════════════════════════════════════════
+ 
     void Start()
     {
         sr = GetComponent<SpriteRenderer>();
-
+ 
         if (waypoints == null || waypoints.Length == 0)
         {
             Debug.LogWarning("FlyingEnemy: ยังไม่ได้ตั้ง Waypoints!");
             enabled = false;
             return;
         }
-
-        // เริ่มที่ Waypoint แรก
+ 
         transform.position = waypoints[0].position;
+ 
+        if (useTurnSystem)
+            TurnManager.Instance?.Register(this);
     }
-
+ 
+    void OnDestroy()
+    {
+        if (useTurnSystem)
+            TurnManager.Instance?.Unregister(this);
+    }
+ 
     void Update()
     {
-        if (waypoints == null || waypoints.Length == 0) return;
-
-        MoveToWaypoint();
+        if (useTurnSystem)
+        {
+            // Turn Mode → แค่เคลื่อนที่ไปยัง Waypoint ปัจจุบัน (OnTurn เซต Waypoint ถัดไปให้)
+            if (isMovingToWaypoint)
+                MoveToCurrentWaypoint();
+        }
+        else
+        {
+            // Free Mode → บินอิสระแบบปกติ
+            MoveToCurrentWaypoint();
+        }
     }
-
-    void MoveToWaypoint()
+ 
+    // ══════════════════════════════════════════════
+    //  ITURNTAKER
+    // ══════════════════════════════════════════════
+ 
+    public void OnTurn()
     {
+        if (waypoints == null || waypoints.Length == 0) return;
+        if (isMovingToWaypoint) return;   // ยังบินไม่ถึงจุดก่อน → รอก่อน
+ 
+        // ตั้ง Waypoint ถัดไปแล้วให้ Update() พาบินไปเอง
+        currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Length;
+        isMovingToWaypoint   = true;
+    }
+ 
+    // ══════════════════════════════════════════════
+    //  MOVEMENT
+    // ══════════════════════════════════════════════
+ 
+    void MoveToCurrentWaypoint()
+    {
+        if (waypoints == null || waypoints.Length == 0) return;
+ 
         Transform target = waypoints[currentWaypointIndex];
-
-        // เคลื่อนที่ไปยัง Waypoint ปัจจุบัน
+ 
+        // ค่อยๆ เคลื่อนที่ไปยัง Waypoint
         transform.position = Vector3.MoveTowards(
             transform.position,
             target.position,
             moveSpeed * Time.deltaTime
         );
-
+ 
         // Flip Sprite ตามทิศทาง
         if (flipSprite && sr != null)
         {
-            float dirX = target.position.x - transform.position.x;
-            if (Mathf.Abs(dirX) > 0.01f)
-                sr.flipX = dirX < 0;
+            float dx = target.position.x - transform.position.x;
+            if (Mathf.Abs(dx) > 0.01f) sr.flipX = dx < 0;
         }
-
-        // ถึง Waypoint แล้ว → ไปจุดถัดไป (Loop)
+ 
+        // ถึง Waypoint แล้ว
         if (Vector3.Distance(transform.position, target.position) < 0.05f)
         {
-            currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Length;
+            transform.position = target.position;
+ 
+            if (useTurnSystem)
+            {
+                // Turn Mode → หยุดรอ Turn ถัดไป
+                isMovingToWaypoint = false;
+            }
+            else
+            {
+                // Free Mode → ไปจุดถัดไปเลย
+                currentWaypointIndex = (currentWaypointIndex + 1) % waypoints.Length;
+            }
         }
     }
-
+ 
+    // ══════════════════════════════════════════════
+    //  COLLISION
+    // ══════════════════════════════════════════════
+ 
     void OnTriggerEnter2D(Collider2D other)
     {
-        PlayerHealth health = other.GetComponent<PlayerHealth>();
-        if (health != null)
-        {
-            health.Die();
-        }
+        other.GetComponent<PlayerHealth>()?.Die();
     }
-
-    void OnCollisionEnter2D(Collision2D collision)
+ 
+    void OnCollisionEnter2D(Collision2D col)
     {
-        PlayerHealth health = collision.gameObject.GetComponent<PlayerHealth>();
-        if (health != null)
-        {
-            health.Die();
-        }
+        col.gameObject.GetComponent<PlayerHealth>()?.Die();
     }
-
-    // แสดงเส้นทางบินใน Scene View
+ 
+    // ══════════════════════════════════════════════
+    //  GIZMOS
+    // ══════════════════════════════════════════════
+ 
     void OnDrawGizmos()
     {
         if (waypoints == null || waypoints.Length == 0) return;
-
+ 
         Gizmos.color = Color.cyan;
         for (int i = 0; i < waypoints.Length; i++)
         {
             if (waypoints[i] == null) continue;
-
             Gizmos.DrawSphere(waypoints[i].position, 0.15f);
-
-            // วาดเส้นเชื่อม Waypoints
             int next = (i + 1) % waypoints.Length;
             if (waypoints[next] != null)
                 Gizmos.DrawLine(waypoints[i].position, waypoints[next].position);

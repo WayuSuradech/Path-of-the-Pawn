@@ -139,7 +139,12 @@ public class PlayerHealth : MonoBehaviour
         isDead = false;
 
         var pc = GetComponent<PlayerController>();
-        if (pc != null) pc.enabled = true;
+        if (pc != null) 
+        {
+            pc.enabled = true;
+            // --- เพิ่มบรรทัดนี้เพื่อแก้ปัญหาเดินไปจุดเหลืองแล้วตายซ้ำ ---
+            pc.ResetMovementState(); 
+        }
 
         var rb = GetComponent<Rigidbody2D>();
         if (rb != null) rb.linearVelocity = Vector2.zero;
